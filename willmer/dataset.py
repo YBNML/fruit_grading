@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+import csv
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PIL import Image
+from torch.utils.data import Dataset
+
+NUMERIC_FIELDS = ("brix", "weight", "height", "max_w", "min_w")
+
+
+def segment_fruit(img_rgb):
+    # HSV background removal tuned for the original sorter rig (blue-tinted backdrop
+    # + white/gray surfaces). Masks out: Hue >= 90 (blue side) and Saturation < 90
+    # (washed-out surfaces). New capture setups with different backgrounds will need
+    # the thresholds re-tuned; disabled by default in training.
+    x = cv2.GaussianBlur(img_rgb, (15, 15), 0)
+    x = cv2.cvtColor(x, cv2.COLOR_RGB2HSV)
+    bg_blue = cv2.inRange(x, (90, 0, 0), (255, 255, 255))
+    bg_gray = cv2.inRange(x, (0, 0, 0), (255, 90, 255))
+    keep = cv2.bitwise_not(cv2.bitwise_or(bg_blue, bg_gray))
+    return cv2.bitwise_and(img_rgb, img_rgb, mask=keep)
+
+
+def load_label_csv(csv_path):
+    with open(csv_path) as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        if "grade" in r and r["grade"] != "":
+            r["grade"] = int(r["grade"])
+        for k in NUMERIC_FIELDS:
+            if k in r and r[k] != "":
+                try:
+                    r[k] = float(r[k])
+                except ValueError:
+                    r[k] = None
+    return rows
+
+
+class FruitDataset(Dataset):
+    def __init__(self, rows, repo_root, target_key="grade", target_is_float=False,
+                 transform=None, mask_bg=False):
+        self.rows = rows
+        self.repo_root = Path(repo_root)
+        self.target_key = target_key
+        self.target_is_float = target_is_float
+        self.transform = transform
+        self.mask_bg = mask_bg
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, idx):
+        r = self.rows[idx]
+        path = self.repo_root / r["img_path"]
+        with open(path, "rb") as f:
+            img = np.array(Image.open(f).convert("RGB"))
+        if self.mask_bg:
+            img = segment_fruit(img)
+        if self.transform is not None:
+            img = self.transform(img)
+        raw = r[self.target_key]
+        target = float(raw) if self.target_is_float else int(raw)
+        # fruit_id lets the eval loop average the 3 views (t1/t2/b1) of a single
+        # fruit back together, since the same fruit is stored as 3 separate rows.
+        fruit_id = f"{r['date']}__{r['fruit_idx']}"
+        return img, target, fruit_id

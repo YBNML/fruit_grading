@@ -1,0 +1,26 @@
+# Raw dataset — too big and partly proprietary; regenerate via make_labels.py
+DB/
+
+# Training outputs — checkpoints are large, stays local
+willmer/runs/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local state
+.claude/
