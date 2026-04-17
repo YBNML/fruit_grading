@@ -21,6 +21,16 @@ FIELDS = [
     "brix", "weight", "height", "max_w", "min_w", "grade",
 ]
 
+# Per-crop sensible measurement ranges. Values outside are treated as data-entry
+# errors and stripped (set to None) so train.py's None-filter drops them per-target.
+# Derived from: commercial size references for the varieties + p1/p99 of clean data.
+SANITY_BOUNDS = {
+    "peach":     {"weight": (100, 700), "height": (50, 110),
+                  "max_w": (50, 120), "min_w": (50, 120), "brix": (8, 20)},
+    "tangerine": {"weight": (50, 400),  "height": (35, 85),
+                  "max_w": (35, 90),   "min_w": (35, 90),  "brix": (8, 20)},
+}
+
 
 def _split_path(raw_path):
     """Pull (date, view, filename) out of an absolute path that contains 'database'."""
@@ -122,6 +132,21 @@ def filter_existing(rows):
     return [r for r in rows if (REPO / r["img_path"]).exists()]
 
 
+def strip_outliers(rows, crop):
+    """Replace out-of-range measurements with None; row survives for other fields."""
+    bounds = SANITY_BOUNDS.get(crop, {})
+    stripped = {k: 0 for k in bounds}
+    for r in rows:
+        for field, (lo, hi) in bounds.items():
+            v = r.get(field)
+            if v is None:
+                continue
+            if not (lo <= float(v) <= hi):
+                r[field] = None
+                stripped[field] += 1
+    return stripped
+
+
 def assign_grade(rows, field):
     # No explicit quality label exists in the raw data; we derive 3 classes as
     # per-crop tertiles of a size-related field. Keeps class distribution balanced
@@ -159,11 +184,19 @@ def main():
         if not rows:
             print(f"[{crop}] no rows with existing images - skipped")
             continue
-        t1, t2 = assign_grade(rows, field=args.grade_field)
+        stripped = strip_outliers(rows, crop)
+        # Grade is computed from the grade_field — drop rows where that field was
+        # stripped as an outlier, otherwise tertiles get skewed by Nones.
+        rows_for_grade = [r for r in rows if r.get(args.grade_field) is not None]
+        t1, t2 = assign_grade(rows_for_grade, field=args.grade_field)
+        for r in rows:
+            if r.get(args.grade_field) is None:
+                r["grade"] = ""  # empty cell; train --task cls will skip these via validation upstream
         out = OUT_DIR / f"label_{crop}.csv"
         write_csv(rows, out)
-        dist = Counter(r["grade"] for r in rows)
+        dist = Counter(r["grade"] for r in rows_for_grade)
         print(f"[{crop}] total={len(raw)}  exists={len(rows)}  "
+              f"stripped outliers: {stripped}  "
               f"{args.grade_field} tertiles=({t1:.2f}, {t2:.2f})  "
               f"grade dist={dict(sorted(dist.items()))}  -> {out.relative_to(REPO)}")
 
