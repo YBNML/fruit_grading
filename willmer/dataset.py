@@ -27,14 +27,17 @@ def load_label_csv(csv_path):
     with open(csv_path) as f:
         rows = list(csv.DictReader(f))
     for r in rows:
-        if "grade" in r and r["grade"] != "":
-            r["grade"] = int(r["grade"])
+        if "grade" in r:
+            r["grade"] = None if r["grade"] == "" else int(r["grade"])
         for k in NUMERIC_FIELDS:
-            if k in r and r[k] != "":
-                try:
-                    r[k] = float(r[k])
-                except ValueError:
+            if k in r:
+                if r[k] == "":
                     r[k] = None
+                else:
+                    try:
+                        r[k] = float(r[k])
+                    except ValueError:
+                        r[k] = None
     return rows
 
 
