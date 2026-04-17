@@ -1,8 +1,8 @@
 # Raw dataset — too big and partly proprietary; regenerate via make_labels.py
 DB/
 
-# Training outputs — checkpoints are large, stays local
-willmer/runs/
+# Model weights — not for public release
+willmer/runs/**/*.pt
 
 # Python bytecode
 __pycache__/
