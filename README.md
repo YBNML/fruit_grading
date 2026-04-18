@@ -114,8 +114,8 @@ true=2     1     34    325    (90.3%)  ← 대
 | 복숭아 | min_w  | 1.50 mm  | 0.908 | 1.69% | **1.24 mm** | **0.938** | **1.41%** |
 | 황금향 | weight | 4.58 g   | 0.909 | 3.17% | **3.55 g**  | **0.923** | **2.52%** |
 | 황금향 | height | 1.49 mm  | 0.732 | 2.57% | **1.26 mm** | **0.773** | **2.18%** |
-| 황금향 | max_w  | _pending_ | | | | | |
-| 황금향 | min_w  | _pending_ | | | | | |
+| 황금향 | max_w  | 1.04 mm  | 0.896 | 1.51% | **0.85 mm** | **0.918** | **1.23%** |
+| 황금향 | min_w  | 0.86 mm  | 0.943 | 1.28% | **0.69 mm** | **0.963** | **1.03%** |
 
 주요 관찰:
 
@@ -186,7 +186,7 @@ python train.py --label label_tangerine.csv --out runs/tan_height   --task reg -
 ## 7. 로드맵
 
 - [x] **Phase 0** 3-grade classification baseline
-- [ ] **Phase 1** 4-target regression (weight / height / max_w / min_w) — *진행 중*
+- [x] **Phase 1** 4-target regression (weight / height / max_w / min_w)
 - [ ] **Phase 2** Multi-task (한 backbone 공유 + 4 heads)
 - [ ] **Phase 3** Multi-view 통합 모델 (3뷰 feature concat)
 - [ ] **Phase 4** 황금향 세그멘테이션 (labelme → YOLOv8-seg / Mask R-CNN)
