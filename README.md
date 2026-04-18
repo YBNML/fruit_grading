@@ -1,4 +1,4 @@
-# disease_02 — Fruit Quality ML Pipeline
+# fruit_grading — Fruit Quality ML Pipeline
 
 과수 선별기(sorter)의 3대 카메라 영상으로 **과일 품질을 자동 분류·회귀**하는 end-to-end
 ML 파이프라인. 복숭아(천중도)와 감귤(황금향) 두 작물을 개별 모델로 학습한다.
@@ -135,8 +135,8 @@ true=2     1     34    325    (90.3%)  ← 대
 ### 5.1 환경 설치
 
 ```bash
-conda create -n disease_02 python=3.11 -y
-conda activate disease_02
+conda create -n fruit_grading python=3.11 -y
+conda activate fruit_grading
 pip install -r willmer/requirements.txt
 ```
 
