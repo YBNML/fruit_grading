@@ -124,3 +124,55 @@ class MultiViewFruitDataset(Dataset):
         target = float(raw) if self.target_is_float else int(raw)
         fruit_id = f"{r0['date']}__{r0['fruit_idx']}"
         return imgs, target, fruit_id
+
+
+class MultiViewMultiTaskDataset(Dataset):
+    """Multi-view dataset that returns multiple regression targets per fruit.
+
+    Returns (imgs, targets, fruit_id) where `targets` is a float tensor of
+    shape (len(target_keys),) in the same order as passed in. Fruits missing
+    any view or any target field are dropped.
+    """
+
+    VIEW_ORDER = ("t1", "t2", "b1")
+
+    def __init__(self, rows, repo_root, target_keys, transform=None, mask_bg=False):
+        self.repo_root = Path(repo_root)
+        self.target_keys = list(target_keys)
+        self.transform = transform
+        self.mask_bg = mask_bg
+
+        groups = defaultdict(dict)
+        for r in rows:
+            groups[(r["date"], r["fruit_idx"])][r["view"]] = r
+
+        self.fruits = []
+        for views in groups.values():
+            if not all(v in views for v in self.VIEW_ORDER):
+                continue
+            r0 = views[self.VIEW_ORDER[0]]
+            if any(r0.get(k) is None for k in self.target_keys):
+                continue
+            self.fruits.append(views)
+
+    def __len__(self):
+        return len(self.fruits)
+
+    def _load(self, row):
+        path = self.repo_root / row["img_path"]
+        with open(path, "rb") as f:
+            img = np.array(Image.open(f).convert("RGB"))
+        if self.mask_bg:
+            img = segment_fruit(img)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+
+    def __getitem__(self, idx):
+        views = self.fruits[idx]
+        imgs = torch.stack([self._load(views[v]) for v in self.VIEW_ORDER], dim=0)
+        r0 = views[self.VIEW_ORDER[0]]
+        targets = torch.tensor([float(r0[k]) for k in self.target_keys],
+                               dtype=torch.float32)
+        fruit_id = f"{r0['date']}__{r0['fruit_idx']}"
+        return imgs, targets, fruit_id

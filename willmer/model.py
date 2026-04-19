@@ -60,3 +60,42 @@ class MultiViewModel(nn.Module):
         feats = self.backbone(flat)                # (B*V, feat_dim)
         feats = feats.reshape(B, V * feats.size(-1))
         return self.head(feats)
+
+
+class MultiViewMultiTaskModel(nn.Module):
+    """Multi-view + multi-task head on a shared backbone.
+
+    Same MV feature pipeline (shared backbone + concat of per-view features) as
+    MultiViewModel, but the final head outputs one scalar per target. Targets
+    have very different scales (weight~100g, height~80mm, brix~12) so the head
+    predicts in normalized (z-score) space; `target_means` / `target_stds` are
+    stored as buffers so inference-time denormalization travels with the
+    checkpoint.
+    """
+
+    def __init__(self, target_keys, backbone="resnet50", pretrained=True, num_views=3):
+        super().__init__()
+        self.target_keys = list(target_keys)
+        self.num_views = num_views
+        self.backbone, feat_dim = _build_feature_extractor(backbone, pretrained)
+        self.head = nn.Linear(num_views * feat_dim, len(self.target_keys))
+        n = len(self.target_keys)
+        self.register_buffer("target_means", torch.zeros(n))
+        self.register_buffer("target_stds", torch.ones(n))
+
+    def set_norm(self, means, stds):
+        self.target_means.data = torch.as_tensor(means, dtype=torch.float32,
+                                                 device=self.target_means.device)
+        self.target_stds.data = torch.as_tensor(stds, dtype=torch.float32,
+                                                device=self.target_stds.device)
+
+    def forward(self, x):
+        # x: (B, V, C, H, W) -> (B, num_targets) in normalized space
+        B, V = x.shape[:2]
+        flat = x.reshape(B * V, *x.shape[2:])
+        feats = self.backbone(flat)
+        feats = feats.reshape(B, V * feats.size(-1))
+        return self.head(feats)
+
+    def denormalize(self, pred_norm):
+        return pred_norm * self.target_stds + self.target_means
