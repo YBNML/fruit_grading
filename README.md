@@ -130,6 +130,36 @@ true=2     1     34    325    (90.3%)  ← 대
   박스 무게가 입력된 것으로 추정. `SANITY_BOUNDS`로 상식 범위 벗어난 값을 None 처리하니
   R²가 0.18 → 0.92로 회복. 소수 outlier의 SS_total 지배 효과 교과서적 사례.
 
+### 4.3 Multi-View Regression (Phase 3)
+
+Phase 1 은 단일 이미지로 학습 후 **추론 시에만** 3뷰 예측을 평균(후처리). Phase 3 은
+모델이 처음부터 3뷰를 **동시에** 입력받는 구조 — ResNet50 backbone을 공유해서 t1/t2/b1
+각각의 feature vector(2048-dim)를 뽑고, 순서대로 concat한 뒤 Linear head로 예측.
+
+| 작물 | target | **MV MAE** | MV R² | MV MAPE | vs Phase 1 | 승자 |
+|---|---|---|---|---|---|---|
+| 복숭아 | weight | **6.78 g**  | 0.988 | 1.78% | -10.9% | **MV** |
+| 복숭아 | height | 1.98 mm     | 0.842 | 2.42% | +2.9%  | SV |
+| 복숭아 | max_w  | **0.96 mm** | 0.973 | 1.02% | -10.0% | **MV** |
+| 복숭아 | min_w  | **1.22 mm** | 0.936 | 1.37% | -1.5%  | MV |
+| 황금향 | weight | 3.89 g      | 0.922 | 2.68% | +9.6%  | SV |
+| 황금향 | height | **1.23 mm** | 0.778 | 2.14% | -2.3%  | MV |
+| 황금향 | max_w  | **0.69 mm** | 0.933 | 1.00% | **-19.3%** | **MV** |
+| 황금향 | **min_w** | **0.57 mm** | **0.975** | **0.85%** | **-17.9%** | **MV** 🏆 |
+
+**6/8에서 MV 우세**, 특히 **황금향 너비(max_w/min_w) 에서 18% 대폭 개선**. 현재까지 최고
+결과는 **황금향 min_w MV: MAPE 0.85%, R² 0.975**.
+
+주요 관찰:
+
+- **너비(max_w/min_w)에서 MV 효과가 큼** — 3뷰가 서로 다른 각도의 최대/최소 너비를
+  관측하므로 모델이 암묵적 3D 재구성 학습 가능. 단일뷰 평균은 이 정보를 잃어버림
+- **높이(height)에서는 MV 이점 미미** — 높이는 어느 뷰에서도 비슷하게 보여 상보 정보 적음
+- **황금향 weight만 SV가 앞섬(+9.6%)** — MV가 epoch 11에 early stop. full 20 epoch 돌렸다면
+  결과가 다를 수 있음. 추가 실험으로 검증 가치 있음
+- **파라미터/연산 비용**: backbone 공유라 파라미터는 head 확장분(3×2048 vs 2048)만 늘어남.
+  학습 시간도 single-view와 거의 동일 (같은 총 이미지를 처리)
+
 ## 5. 재현 방법
 
 ### 5.1 환경 설치
@@ -174,6 +204,15 @@ python train.py --label label_tangerine.csv --out runs/tan_height   --task reg -
 주요 옵션: `--epochs 20 --patience 5 --batch-size 16 --lr 1e-3 --mask-bg`.
 생성물: `runs/{exp}/best.pt`(무시됨) + `runs/{exp}/history.json`(공개).
 
+Phase 3 (multi-view) 는 별도 스크립트:
+
+```bash
+python train_mv.py --label label_peach.csv --out runs_mv/peach_weight --task reg --target weight
+```
+
+차이점: 샘플 단위가 과일 1개(3뷰 stack); `--batch-size 8` 기본값 (샘플당 이미지 3배).
+`MultiViewModel` 은 backbone을 3번 공유 forward하여 feature concat 후 head로 예측.
+
 ## 6. 기술 스택
 
 - **Framework**: PyTorch 2.11, torchvision 0.26
@@ -187,8 +226,8 @@ python train.py --label label_tangerine.csv --out runs/tan_height   --task reg -
 
 - [x] **Phase 0** 3-grade classification baseline
 - [x] **Phase 1** 4-target regression (weight / height / max_w / min_w)
+- [x] **Phase 3** Multi-view 통합 모델 (3뷰 feature concat) — 6/8 target에서 SV 우세
 - [ ] **Phase 2** Multi-task (한 backbone 공유 + 4 heads)
-- [ ] **Phase 3** Multi-view 통합 모델 (3뷰 feature concat)
 - [ ] **Phase 4** 황금향 세그멘테이션 (labelme → YOLOv8-seg / Mask R-CNN)
 - [ ] **Phase 5** Brix 회귀 (내부 성질, 난이도 ↑)
 

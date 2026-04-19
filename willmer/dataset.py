@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import csv
+from collections import defaultdict
 from pathlib import Path
 
 import cv2
 import numpy as np
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -69,3 +71,56 @@ class FruitDataset(Dataset):
         # fruit back together, since the same fruit is stored as 3 separate rows.
         fruit_id = f"{r['date']}__{r['fruit_idx']}"
         return img, target, fruit_id
+
+
+class MultiViewFruitDataset(Dataset):
+    """Groups rows into one sample per fruit; returns a stacked (3, C, H, W) tensor.
+
+    Views are ordered t1 -> t2 -> b1 so the downstream model can learn per-view
+    features by position. Fruits missing any of the three views, or missing the
+    target field in any row, are dropped.
+    """
+
+    VIEW_ORDER = ("t1", "t2", "b1")
+
+    def __init__(self, rows, repo_root, target_key="weight", target_is_float=True,
+                 transform=None, mask_bg=False):
+        self.repo_root = Path(repo_root)
+        self.target_key = target_key
+        self.target_is_float = target_is_float
+        self.transform = transform
+        self.mask_bg = mask_bg
+
+        groups = defaultdict(dict)
+        for r in rows:
+            groups[(r["date"], r["fruit_idx"])][r["view"]] = r
+
+        self.fruits = []
+        for views in groups.values():
+            if not all(v in views for v in self.VIEW_ORDER):
+                continue
+            if any(views[v].get(target_key) is None for v in self.VIEW_ORDER):
+                continue
+            self.fruits.append(views)
+
+    def __len__(self):
+        return len(self.fruits)
+
+    def _load(self, row):
+        path = self.repo_root / row["img_path"]
+        with open(path, "rb") as f:
+            img = np.array(Image.open(f).convert("RGB"))
+        if self.mask_bg:
+            img = segment_fruit(img)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+
+    def __getitem__(self, idx):
+        views = self.fruits[idx]
+        imgs = torch.stack([self._load(views[v]) for v in self.VIEW_ORDER], dim=0)
+        r0 = views[self.VIEW_ORDER[0]]
+        raw = r0[self.target_key]
+        target = float(raw) if self.target_is_float else int(raw)
+        fruit_id = f"{r0['date']}__{r0['fruit_idx']}"
+        return imgs, target, fruit_id

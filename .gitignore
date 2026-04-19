@@ -2,7 +2,7 @@
 DB/
 
 # Model weights — not for public release
-willmer/runs/**/*.pt
+willmer/runs*/**/*.pt
 
 # Python bytecode
 __pycache__/
