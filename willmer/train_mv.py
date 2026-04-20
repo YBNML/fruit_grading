@@ -148,7 +148,8 @@ def main():
     ap.add_argument("--target", default=None,
                     help="cls: grade. reg: weight|height|max_w|min_w|brix (default=weight)")
     ap.add_argument("--repo-root", default=str(Path(__file__).resolve().parent.parent))
-    ap.add_argument("--backbone", default="resnet50", choices=["resnet50", "densenet201"])
+    ap.add_argument("--backbone", default="resnet50",
+                    choices=["resnet50", "densenet201", "vit_b_16"])
     ap.add_argument("--epochs", type=int, default=20)
     ap.add_argument("--patience", type=int, default=5)
     ap.add_argument("--batch-size", type=int, default=8,

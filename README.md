@@ -206,6 +206,40 @@ uncertainty-weighted loss / task별 gradient balancing. 그러나 Phase 3 성능
 **운용 권장**: **Phase 3 (MV + 단일태스크 4개 모델)** 이 가장 정확. 모델 관리 비용이
 고민이면 Phase 2 를 2 모델(크롭당 1) 로 쓸 수도 있으나 MAPE 1.5%p 정도 손해 감안.
 
+### 4.5 Backbone 비교: ViT-B/16 vs ResNet50 (Phase 3 구조 위에서)
+
+**CNN(ResNet50) vs Transformer(ViT-B/16)** 비교. Phase 3(MV) 구조 고정, backbone만
+교체. 두 대표 target(weight / brix) × 2 작물 = 4 실험. 같은 optimizer(SGD mom=0.9,
+lr=1e-3), 같은 epoch(20 + patience 5), ViT batch=4 (메모리).
+
+| target | ViT MAE | ResNet50 MAE | ΔMAE | ViT R² | R50 R² |
+|---|---|---|---|---|---|
+| peach weight     | 60.71 g   | **6.78 g**   | +795.5% | -0.008 | **0.988** |
+| peach brix       | 0.613 °Bx | **0.472 °Bx** | +29.9%  | 0.473  | **0.676** |
+| tangerine weight | 4.213 g   | **3.890 g**  | +8.3%   | 0.914  | **0.922** |
+| tangerine brix   | 0.392 °Bx | **0.298 °Bx** | +31.4%  | 0.355  | **0.629** |
+
+**ResNet50 이 4/4 전승**. 격차는 +8% (tangerine weight, 근접) 에서 +796% (peach weight,
+완전 실패) 까지 target-조합별로 큼.
+
+주요 관찰:
+
+- **peach weight ViT 의 완전 실패**: R² -0.008 은 모델이 본질적으로 평균만 예측한다는
+  뜻. Early stop 이 epoch 12 에서 발동 — 학습 곡선이 plateau 에 갇힘. SGD+lr=1e-3 이
+  CNN 기준 세팅이라 ViT 에게 불리했을 가능성 큼. 같은 recipe 로 돌린 다른 3 실험은
+  정상 학습됐으니 특정 시드/초기화 조합 이슈일 수도 있음
+- **데이터가 많은 쪽이 ViT 에 유리**: 황금향(n=2,309 과일) > 복숭아(n=1,278). 황금향
+  weight 는 ViT 가 CNN 과 8% 격차까지 좁힘. ViT 가 data-hungry 하다는 통설 검증
+- **Brix 태스크에서도 CNN 우세**: "ViT 의 global attention 이 외형 기반 내부성질 예측에
+  유리할 수 있다" 는 가설은 지지되지 않음. 두 작물 모두 ViT 가 ~30% 더 나쁨
+- **"공정 비교 recipe" 의 한계**: ViT 는 관례상 AdamW + lr 1e-4~1e-5 + warmup +
+  cosine LR + batch size 64+ 가 표준. 같은 SGD recipe 로 비교한 건 CNN 편향. 별도
+  튜닝으로 격차 줄일 여지 있음 — 그러나 "CNN 기준 recipe 에서 CNN 이 압승" 자체가
+  엔지니어링 결정 근거로 의미 있음
+
+**운용 권장**: 이 데이터셋/예산 조건에선 ResNet50 이 명확한 기본 선택. ViT 도입은
+(1) 데이터가 수만 단위로 늘거나, (2) ViT 전용 recipe 로 재학습 가능할 때 재검토.
+
 ## 5. 재현 방법
 
 ### 5.1 환경 설치
@@ -284,6 +318,7 @@ train split 기준으로 계산, 모델 buffer(`target_means`, `target_stds`)에
 - [x] **Phase 3** Multi-view 통합 모델 (3뷰 feature concat) — 6/8에서 SV 우세, **현재 best**
 - [x] **Phase 2** Multi-view + Multi-task — 전 target Phase 3 대비 후퇴 (통설 반증 케이스)
 - [x] **Phase 5** Brix(당도) 회귀 — MV MAPE 2.6~3.6%, 외형 기반 당도 예측 실현 가능성 확인
+- [x] **Backbone 비교** ResNet50 vs ViT-B/16 — CNN 4/4 승 (같은 recipe 기준)
 - [ ] **Phase 4** 황금향 세그멘테이션 (labelme → YOLOv8-seg / Mask R-CNN)
 - [ ] **Phase 5** Brix 회귀 (내부 성질, 난이도 ↑)
 

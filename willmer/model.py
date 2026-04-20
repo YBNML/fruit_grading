@@ -2,7 +2,9 @@
 import torch
 import torch.nn as nn
 import torchvision.models as tvm
-from torchvision.models import ResNet50_Weights, DenseNet201_Weights
+from torchvision.models import (
+    ResNet50_Weights, DenseNet201_Weights, ViT_B_16_Weights,
+)
 
 
 def build_model(name="resnet50", num_outputs=3, pretrained=True):
@@ -31,6 +33,11 @@ def _build_feature_extractor(name, pretrained):
         m = tvm.densenet201(weights=w)
         dim = m.classifier.in_features
         m.classifier = nn.Identity()
+    elif name == "vit_b_16":
+        w = ViT_B_16_Weights.IMAGENET1K_V1 if pretrained else None
+        m = tvm.vit_b_16(weights=w)
+        dim = m.hidden_dim  # 768 for ViT-B/16
+        m.heads = nn.Identity()
     else:
         raise ValueError(f"unknown model: {name}")
     return m, dim
