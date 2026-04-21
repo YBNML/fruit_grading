@@ -185,26 +185,26 @@ def slide_problem(prs):
                  "선별기의 3대 카메라 영상으로 과일 품질·치수를 자동 측정")
 
     add_text(s, Inches(0.6), Inches(1.7), Inches(6.0), Inches(0.5),
-             "현재 워크플로우 (수작업)", size=16, bold=True, color=C_ACCENT)
+             "현재 워크플로우 (각 장비 개별 측정)", size=16, bold=True, color=C_ACCENT)
     add_bullets(s, Inches(0.6), Inches(2.2), Inches(6.0), Inches(3.5), [
-        "작업자가 개별 과일을 육안/캘리퍼스로 측정",
-        "등급 판정 주관적, 작업자 간 편차",
-        "대량 처리 시 속도·피로도 제약",
-        "당도(brix)는 별도 샘플링으로 파괴적 측정",
+        "전수 측정: 전자저울(무게) + 캘리퍼스(치수) + 비파괴 당도계(brix)",
+        "과일 1개당 ≥3 개 장비 순차 거치 → 처리 속도 병목",
+        "작업자 반복 조작 필요, 대량 처리 시 피로·오차 누적",
+        "선별기 카메라는 이미 존재 — 측정에 활용되지 못함",
     ], size=14)
 
     add_text(s, Inches(7.0), Inches(1.7), Inches(6.0), Inches(0.5),
-             "목표: 자동화 파이프라인", size=16, bold=True, color=C_GREEN)
+             "목표: 카메라 단일 파이프라인으로 통합", size=16, bold=True, color=C_GREEN)
     add_bullets(s, Inches(7.0), Inches(2.2), Inches(6.0), Inches(3.5), [
-        "3뷰(top1/top2/bottom1) 이미지 → 측정값 회귀",
-        "weight(g) / height·max_w·min_w(mm) / brix(°Bx) 예측",
-        "실시간 등급화 (tertile 기반 3-grade)",
+        "3뷰(top1/top2/bottom1) 이미지 → 측정값 직접 회귀",
+        "weight(g) / height·max_w·min_w(mm) / brix(°Bx) 동시 예측",
+        "별도 저울·캘리퍼스·당도계 없이 선별기 흐름 중 자동화",
         "작물별(복숭아 / 감귤) 개별 모델 학습",
     ], size=14)
 
     add_text(s, Inches(0.6), Inches(6.0), Inches(12.0), Inches(0.5),
-             "Why this matters: 선별 일관성·속도·비접촉 brix 측정 → 농가 상품성↑, "
-             "작업자 피로↓, 외산 장비 대체",
+             "Why this matters: 3 장비 통합으로 처리량↑·인력↓, "
+             "이미지 기반 등급화로 선별 일관성 확보, 기존 선별기 하드웨어 재활용",
              size=13, color=C_MUTED, bold=True)
 
 
@@ -614,14 +614,17 @@ def slide_future_short(prs):
         ("8. 모델 경량화 + ONNX",
          "MobileNet / EfficientNet 기반 MV 모델 → ONNX/CoreML 변환. "
          "선별기 엣지 배포 (<100ms latency) 타겟"),
+        ("9. Multi-view Attention Fusion",
+         "concat 대신 learnable weighted-avg (softmax α_t1,t2,b1). 파라미터 3개 추가로 "
+         "뷰별 기여도 명시 학습 + 해석성 확보. Self-attention은 데이터 규모상 risky"),
     ]
-    y = Inches(1.7)
+    y = Inches(1.65)
     for title, body in items:
         add_text(s, Inches(0.6), y, Inches(3.8), Inches(0.4),
-                 title, size=12, bold=True, color=C_ACCENT)
-        add_text(s, Inches(4.4), y, Inches(8.5), Inches(0.65),
+                 title, size=11, bold=True, color=C_ACCENT)
+        add_text(s, Inches(4.4), y, Inches(8.5), Inches(0.6),
                  body, size=10, color=C_TITLE)
-        y += Inches(0.63)
+        y += Inches(0.58)
 
 
 def slide_future_mid(prs):
